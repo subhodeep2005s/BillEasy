@@ -17,6 +17,7 @@ import {
 import Modal from "react-native-modal";
 import ProductsList from "./components/ProductsList";
 import SearchBar from "./components/SearchBar";
+import PagesIcon from "./components/pagesIcon";
 
 const { width } = Dimensions.get('window');
 
@@ -49,6 +50,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [cartItemCount, setCartItemCount] = useState(0);
 
+  // ✅ New states for search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+
   // Load cart count from localStorage
   const loadCartCount = async () => {
     try {
@@ -72,36 +77,84 @@ export default function App() {
     }, [])
   );
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        "https://erp-pos-backend.onrender.com/products/all"
-      );
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        // Sort products in descending order (newest first)
-        const sortedProducts = data.sort((a, b) => {
-          // If createdAt exists, use it; otherwise use _id or name
-          if (a.createdAt && b.createdAt) {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          } else if (a._id && b._id) {
-            return b._id.localeCompare(a._id);
-          } else {
-            return b.name.localeCompare(a.name);
-          }
-        });
-        setProducts(sortedProducts);
-      } else {
-        setProducts([]);
+
+
+  // search logic
+  // inside index.tsx
+const handleSearch = async (query: string) => {
+  setSearchQuery(query);
+
+  if (!query.trim()) {
+    // If search is empty, show all products
+    setFilteredProducts(products);
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      "https://erp-pos-backend.onrender.com/show-product",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productKwrds: query }),
       }
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
+    );
+
+    const result = await response.json();
+
+    if (response.ok && Array.isArray(result.products)) {
+      setFilteredProducts(result.products);
+    } else {
+      // No matches or error
+      setFilteredProducts([]);
     }
-  };
+  } catch (error) {
+    console.error("Search error:", error);
+    setFilteredProducts([]);
+  }
+};
+
+
+
+const fetchProducts = async () => {
+  try {
+    setLoading(true);
+    const response = await fetch(
+      "https://erp-pos-backend.onrender.com/show-product",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productKwrds: "" }), // send empty to get all products
+      }
+    );
+    const result = await response.json();
+
+    if (response.ok && Array.isArray(result.products)) {
+      // Sort products in descending order (newest first)
+      const sortedProducts = (result.products as Product[]).sort((a, b) => {
+        if (a.createdAt && b.createdAt) {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        } else if (a._id && b._id) {
+          return b._id.localeCompare(a._id);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      });
+
+      setProducts(sortedProducts);
+      setFilteredProducts(sortedProducts); // show all by default
+    } else {
+      setProducts([]);
+      setFilteredProducts([]);
+    }
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    setProducts([]);
+    setFilteredProducts([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchProducts();
@@ -245,6 +298,7 @@ export default function App() {
           <Text style={styles.headerTitle}>ERP POS System</Text>
           <Text style={styles.headerSubtitle}>Inventory Management</Text>
         </View>
+       
         
         {/* Enhanced Cart Icon with Badge */}
         <TouchableOpacity style={styles.cartContainer}>
@@ -263,9 +317,25 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+<PagesIcon/>
 
 
-      <ProductsList products={products} loading={loading} />
+
+
+      <SearchBar
+  value={searchQuery}
+  onChange={handleSearch}
+  placeholder="Search by name or barcode..."
+/>
+
+
+
+
+      {/* <ProductsList products={products} loading={loading} /> */}
+      <ProductsList
+  products={searchQuery.trim() ? filteredProducts : products}
+  loading={loading}
+/>
 
       {!isScanning && !isScanningCheckout && (
         <View style={styles.actionButtonsContainer}>
