@@ -1,4 +1,5 @@
 
+
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -7,6 +8,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -28,11 +30,9 @@ type Product = {
   price: number;
   stock: number;
   category?: string;
+  description?: string;
   createdAt?: string;
 };
-
-
-
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -41,20 +41,19 @@ export default function App() {
   const [barcode, setBarcode] = useState("");
   const [isModalVisible, setModalVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
+  const [existingProduct, setExistingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     price: "",
     stock: "",
+    description: "",
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [cartItemCount, setCartItemCount] = useState(0);
-
-  // ✅ New states for search
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
-  // Load cart count from localStorage
   const loadCartCount = async () => {
     try {
       const storedCart = await AsyncStorage.getItem("cart");
@@ -70,91 +69,81 @@ export default function App() {
     }
   };
 
-  // Update cart count when screen is focused
   useFocusEffect(
     useCallback(() => {
       loadCartCount();
     }, [])
   );
 
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
 
+    if (!query.trim()) {
+      setFilteredProducts(products);
+      return;
+    }
 
-  // search logic
-  // inside index.tsx
-const handleSearch = async (query: string) => {
-  setSearchQuery(query);
+    try {
+      const response = await fetch(
+        "https://erp-pos-backend.onrender.com/show-product",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productKwrds: query }),
+        }
+      );
 
-  if (!query.trim()) {
-    // If search is empty, show all products
-    setFilteredProducts(products);
-    return;
-  }
+      const result = await response.json();
 
-  try {
-    const response = await fetch(
-      "https://erp-pos-backend.onrender.com/show-product",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productKwrds: query }),
+      if (response.ok && Array.isArray(result.products)) {
+        setFilteredProducts(result.products);
+      } else {
+        setFilteredProducts([]);
       }
-    );
-
-    const result = await response.json();
-
-    if (response.ok && Array.isArray(result.products)) {
-      setFilteredProducts(result.products);
-    } else {
-      // No matches or error
+    } catch (error) {
+      console.error("Search error:", error);
       setFilteredProducts([]);
     }
-  } catch (error) {
-    console.error("Search error:", error);
-    setFilteredProducts([]);
-  }
-};
+  };
 
-
-
-const fetchProducts = async () => {
-  try {
-    setLoading(true);
-    const response = await fetch(
-      "https://erp-pos-backend.onrender.com/show-product",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productKwrds: "" }), // send empty to get all products
-      }
-    );
-    const result = await response.json();
-
-    if (response.ok && Array.isArray(result.products)) {
-      // Sort products in descending order (newest first)
-      const sortedProducts = (result.products as Product[]).sort((a, b) => {
-        if (a.createdAt && b.createdAt) {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        } else if (a._id && b._id) {
-          return b._id.localeCompare(a._id);
-        } else {
-          return b.name.localeCompare(a.name);
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        "https://erp-pos-backend.onrender.com/show-product",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productKwrds: "" }),
         }
-      });
+      );
+      const result = await response.json();
 
-      setProducts(sortedProducts);
-      setFilteredProducts(sortedProducts); // show all by default
-    } else {
+      if (response.ok && Array.isArray(result.products)) {
+        const sortedProducts = (result.products as Product[]).sort((a, b) => {
+          if (a.createdAt && b.createdAt) {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          } else if (a._id && b._id) {
+            return b._id.localeCompare(a._id);
+          } else {
+            return b.name.localeCompare(a.name);
+          }
+        });
+
+        setProducts(sortedProducts);
+        setFilteredProducts(sortedProducts);
+      } else {
+        setProducts([]);
+        setFilteredProducts([]);
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error);
       setProducts([]);
       setFilteredProducts([]);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    setProducts([]);
-    setFilteredProducts([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchProducts();
@@ -182,14 +171,28 @@ const fetchProducts = async () => {
     );
   }
 
-  // Add Product Scanning
-  const handleAddBarcodeScanned = ({ data }: { data: string }) => {
+  const handleAddBarcodeScanned = async ({ data }: { data: string }) => {
     setIsScanning(false);
     setBarcode(data);
+    
+    // Check if product exists
+    const product = products.find((p) => p.barcode === data);
+    if (product) {
+      setExistingProduct(product);
+      setFormData({
+        name: product.name,
+        price: product.price.toString(),
+        stock: "",
+        description: product.description || "",
+      });
+    } else {
+      setExistingProduct(null);
+      setFormData({ name: "", price: "", stock: "", description: "" });
+    }
+    
     setModalVisible(true);
   };
 
-  // Checkout Scanning
   const handleCheckoutBarcodeScanned = ({ data }: { data: string }) => {
     const product = products.find((p) => p.barcode === data);
     if (product) {
@@ -203,43 +206,79 @@ const fetchProducts = async () => {
     }
   };
 
-  // Add Product Submit
   const handleAddSubmit = async () => {
-    if (!formData.name.trim() || !formData.price.trim() || !formData.stock.trim()) {
-      Alert.alert("Validation Error", "Please fill all fields");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        "https://erp-pos-backend.onrender.com/add-product",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            barcode,
-            name: formData.name.trim(),
-            price: Number(formData.price),
-            quantity: Number(formData.stock),
-          }),
-        }
-      );
-      const result = await response.json();
-      if (response.ok) {
-        Alert.alert("Success", result.message || "Product added successfully!");
-        fetchProducts();
-      } else {
-        Alert.alert("Error", result.message || "Failed to add product");
+    if (existingProduct) {
+      // Update existing product (only stock and price)
+      if (!formData.price.trim() || !formData.stock.trim()) {
+        Alert.alert("Validation Error", "Please fill price and stock fields");
+        return;
       }
-    } catch (error) {
-      console.error("Add product error:", error);
-      Alert.alert("Network Error", "Failed to connect to server");
-    } finally {
-      resetModal();
+
+      try {
+        const response = await fetch(
+          "https://erp-pos-backend.onrender.com/add-product",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              barcode,
+              name: existingProduct.name,
+              price: Number(formData.price),
+              quantity: Number(formData.stock),
+            }),
+          }
+        );
+        const result = await response.json();
+        if (response.ok) {
+          Alert.alert("Success", "Product stock updated successfully!");
+          fetchProducts();
+        } else {
+          Alert.alert("Error", result.message || "Failed to update product");
+        }
+      } catch (error) {
+        console.error("Update product error:", error);
+        Alert.alert("Network Error", "Failed to connect to server");
+      } finally {
+        resetModal();
+      }
+    } else {
+      // Add new product (all fields required)
+      if (!formData.name.trim() || !formData.price.trim() || !formData.stock.trim()) {
+        Alert.alert("Validation Error", "Please fill all required fields");
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "https://erp-pos-backend.onrender.com/add-product",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              barcode,
+              name: formData.name.trim(),
+              price: Number(formData.price),
+              quantity: Number(formData.stock),
+              description: formData.description.trim(),
+            }),
+          }
+        );
+        const result = await response.json();
+        if (response.ok) {
+          Alert.alert("Success", result.message || "Product added successfully!");
+          fetchProducts();
+        } else {
+          Alert.alert("Error", result.message || "Failed to add product");
+        }
+      } catch (error) {
+        console.error("Add product error:", error);
+        Alert.alert("Network Error", "Failed to connect to server");
+      } finally {
+        resetModal();
+      }
     }
   };
 
-  // Checkout Submit → API + Local Storage
   const handleSell = async () => {
     if (!barcode || !scannedProduct) return;
 
@@ -255,7 +294,6 @@ const fetchProducts = async () => {
       const result = await response.json();
       
       if (response.ok) {
-        // Add scanned product to local cart
         const storedCart = await AsyncStorage.getItem("cart");
         let cart = storedCart ? JSON.parse(storedCart) : [];
         
@@ -269,7 +307,7 @@ const fetchProducts = async () => {
         setCartItemCount(cart.length);
         
         Alert.alert("Success", "Product added to cart!");
-        fetchProducts(); // Refresh to update stock
+        fetchProducts();
       } else {
         Alert.alert("Error", result.message || "Failed to checkout product");
       }
@@ -284,72 +322,62 @@ const fetchProducts = async () => {
   const resetModal = () => {
     setModalVisible(false);
     setScannedProduct(null);
+    setExistingProduct(null);
     setBarcode("");
-    setFormData({ name: "", price: "", stock: "" });
+    setFormData({ name: "", price: "", stock: "", description: "" });
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
       
-      {/* Enhanced Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>ERP POS System</Text>
           <Text style={styles.headerSubtitle}>Inventory Management</Text>
         </View>
        
-        
-        {/* Enhanced Cart Icon with Badge */}
-        <TouchableOpacity style={styles.cartContainer}>
-          <Link href="./cart" asChild>
-            <TouchableOpacity style={styles.cartIcon}>
-              <Ionicons name="cart-outline" size={24} color="#1f2937" />
-              {cartItemCount > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>
-                    {cartItemCount > 99 ? '99+' : cartItemCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </Link>
-        </TouchableOpacity>
-      </View>
-
-<PagesIcon/>
-
-
-
-
-      <SearchBar
-  value={searchQuery}
-  onChange={handleSearch}
-  placeholder="Search by name or barcode..."
-/>
-
-
-
-
-      {/* <ProductsList products={products} loading={loading} /> */}
-      <ProductsList
-  products={searchQuery.trim() ? filteredProducts : products}
-  loading={loading}
-/>
-
-      {!isScanning && !isScanningCheckout && (
-        <View style={styles.actionButtonsContainer}>
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.addButton]}
+            style={styles.addProductIconButton}
             onPress={() => setIsScanning(true)}
             activeOpacity={0.8}
           >
-            <View style={styles.buttonContent}>
-              <Ionicons name="add-circle-outline" size={24} color="white" />
-              <Text style={styles.buttonText}>Add Product</Text>
-            </View>
+            <Ionicons name="add" size={24} color="#3b82f6" />
           </TouchableOpacity>
           
+          <TouchableOpacity style={styles.cartContainer}>
+            <Link href="./cart" asChild>
+              <TouchableOpacity style={styles.cartIcon}>
+                <Ionicons name="cart-outline" size={24} color="#1f2937" />
+                {cartItemCount > 0 && (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>
+                      {cartItemCount > 99 ? '99+' : cartItemCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Link>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <PagesIcon/>
+
+      <SearchBar
+        value={searchQuery}
+        onChange={handleSearch}
+        placeholder="Search by name or barcode..."
+      />
+
+      <ProductsList
+        products={searchQuery.trim() ? filteredProducts : products}
+        loading={loading}
+      />
+
+      {!isScanning && !isScanningCheckout && (
+        <View style={styles.actionButtonsContainer}>
           <TouchableOpacity
             style={[styles.actionButton, styles.checkoutButton]}
             onPress={() => setIsScanningCheckout(true)}
@@ -373,7 +401,6 @@ const fetchProducts = async () => {
             }}
           />
           
-          {/* Camera Overlay */}
           <View style={styles.cameraOverlay}>
             <View style={styles.scanArea}>
               <View style={styles.scanFrame} />
@@ -397,7 +424,6 @@ const fetchProducts = async () => {
         </View>
       )}
 
-      {/* Enhanced Modal */}
       <Modal
         isVisible={isModalVisible}
         onBackdropPress={resetModal}
@@ -409,14 +435,14 @@ const fetchProducts = async () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {scannedProduct ? "Confirm Sale" : "Add New Product"}
+                {scannedProduct ? "Confirm Sale" : existingProduct ? "Update Product Stock" : "Add New Product"}
               </Text>
               <TouchableOpacity onPress={resetModal} style={styles.modalCloseButton}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView style={styles.modalBody}>
               {scannedProduct ? (
                 <View style={styles.productDetails}>
                   <View style={styles.productHeader}>
@@ -454,20 +480,31 @@ const fetchProducts = async () => {
                     <Text style={styles.barcodeText}>{barcode}</Text>
                   </View>
                   
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Product Name</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter product name"
-                      value={formData.name}
-                      onChangeText={(text) => setFormData({ ...formData, name: text })}
-                      autoCapitalize="words"
-                    />
-                  </View>
+                  {existingProduct && (
+                    <View style={styles.existingProductBanner}>
+                      <Ionicons name="information-circle" size={20} color="#3b82f6" />
+                      <Text style={styles.existingProductText}>
+                        Product exists: {existingProduct.name}
+                      </Text>
+                    </View>
+                  )}
+
+                  {!existingProduct && (
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Product Name *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter product name"
+                        value={formData.name}
+                        onChangeText={(text) => setFormData({ ...formData, name: text })}
+                        autoCapitalize="words"
+                      />
+                    </View>
+                  )}
                   
                   <View style={styles.inputRow}>
                     <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.inputLabel}>Price (₹)</Text>
+                      <Text style={styles.inputLabel}>Price (₹) *</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="0.00"
@@ -478,7 +515,7 @@ const fetchProducts = async () => {
                     </View>
                     
                     <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-                      <Text style={styles.inputLabel}>Stock</Text>
+                      <Text style={styles.inputLabel}>Stock *</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="0"
@@ -488,6 +525,21 @@ const fetchProducts = async () => {
                       />
                     </View>
                   </View>
+
+                  {!existingProduct && (
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Description</Text>
+                      <TextInput
+                        style={[styles.input, styles.textArea]}
+                        placeholder="Enter product description (optional)"
+                        value={formData.description}
+                        onChangeText={(text) => setFormData({ ...formData, description: text })}
+                        multiline
+                        numberOfLines={4}
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  )}
                   
                   <TouchableOpacity 
                     style={styles.saveButton} 
@@ -495,11 +547,13 @@ const fetchProducts = async () => {
                     activeOpacity={0.8}
                   >
                     <Ionicons name="checkmark-circle" size={20} color="white" style={{ marginRight: 8 }} />
-                    <Text style={styles.saveButtonText}>Save Product</Text>
+                    <Text style={styles.saveButtonText}>
+                      {existingProduct ? "Update Stock" : "Save Product"}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -513,7 +567,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc" 
   },
   
-  // Permission styles
   permissionContainer: {
     flex: 1,
     backgroundColor: "#f8fafc",
@@ -558,7 +611,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Header styles
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -587,7 +639,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   
-  // Cart styles
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  addProductIconButton: {
+    backgroundColor: '#eff6ff',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
   cartContainer: {
     position: 'relative',
   },
@@ -616,26 +679,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Action buttons
   actionButtonsContainer: {
     position: 'absolute',
     bottom: 30,
     left: 20,
     right: 20,
-    flexDirection: 'row',
-    gap: 16,
   },
   actionButton: {
-    flex: 1,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
-  },
-  addButton: {
-    backgroundColor: '#3b82f6',
   },
   checkoutButton: {
     backgroundColor: '#10b981',
@@ -654,7 +710,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
-  // Camera styles
   cameraContainer: {
     position: 'absolute',
     top: 0,
@@ -706,7 +761,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
-  // Modal styles
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -731,6 +785,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
+    flex: 1,
   },
   modalCloseButton: {
     padding: 4,
@@ -739,7 +794,6 @@ const styles = StyleSheet.create({
     padding: 24,
   },
 
-  // Product details styles
   productDetails: {
     alignItems: 'center',
   },
@@ -801,7 +855,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Form styles
   addProductForm: {
     width: '100%',
   },
@@ -811,7 +864,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f8ff',
     padding: 16,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   barcodeText: {
     fontSize: 16,
@@ -819,6 +872,23 @@ const styles = StyleSheet.create({
     color: '#3b82f6',
     marginLeft: 12,
     fontFamily: 'monospace',
+  },
+  existingProductBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  existingProductText: {
+    fontSize: 14,
+    color: '#1e40af',
+    marginLeft: 8,
+    flex: 1,
+    fontWeight: '500',
   },
   inputContainer: {
     marginBottom: 16,
@@ -841,6 +911,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#f9fafb',
+  },
+  textArea: {
+    minHeight: 100,
+    paddingTop: 12,
   },
   saveButton: {
     backgroundColor: '#3b82f6',

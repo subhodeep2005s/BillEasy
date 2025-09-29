@@ -46,6 +46,7 @@ export default function History() {
   const [salesData, setSalesData] = useState<SalesData | null>(null);
   const [selectedDays, setSelectedDays] = useState(7);
   const [groupedCarts, setGroupedCarts] = useState<GroupedCart[]>([]);
+  const [noOfSales, setNoOfSales] = useState(0);
 
   const dayOptions = [7, 15, 30, 60, 90];
 
@@ -62,6 +63,7 @@ export default function History() {
       if (response.ok) {
         setSalesData(data);
         groupCartItems(data.item_details);
+        setNoOfSales(data.item_details.length);
       }
     } catch (error) {
       console.error('Error fetching sales report:', error);
@@ -209,7 +211,7 @@ export default function History() {
           <Ionicons name="cart" size={24} color="#3b82f6" />
           <View style={styles.statContent}>
             <Text style={styles.statLabel}>Transactions</Text>
-            <Text style={styles.statValue}>{groupedCarts.length}</Text>
+            <Text style={styles.statValue}>{noOfSales}</Text>
           </View>
         </View>
       </View>
