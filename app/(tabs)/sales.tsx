@@ -1,6 +1,7 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useFocusEffect } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -10,9 +11,9 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 type Product = {
   barcode: string;
@@ -31,18 +32,22 @@ export default function Sales() {
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [selectedDays, setSelectedDays] = useState(30);
-  const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
+  const [chartType, setChartType] = useState<"bar" | "pie">("bar");
 
   const dayOptions = [1, 7, 15, 30, 60, 90];
 
   const fetchSalesReport = async (days: number) => {
     try {
+      const token = await SecureStore.getItemAsync("accessToken");
       setLoading(true);
       const response = await fetch(
-        'https://erp-pos-backend.onrender.com/sales-report',
+        "https://erp-pos-backend.onrender.com/product/sales-report",
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ days }),
         }
       );
@@ -52,7 +57,7 @@ export default function Sales() {
         setReportData(data); // ✅ directly use API response
       }
     } catch (error) {
-      console.error('Error fetching sales report:', error);
+      console.error("Error fetching sales report:", error);
     } finally {
       setLoading(false);
     }
@@ -73,17 +78,19 @@ export default function Sales() {
   };
 
   const getChartColors = () => [
-    '#3b82f6',
-    '#10b981',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
   ];
 
   const renderBarChart = () => {
     if (!reportData?.sellChartData) return null;
 
-    const maxSales = Math.max(...reportData.sellChartData.map((item) => item.sales));
+    const maxSales = Math.max(
+      ...reportData.sellChartData.map((item) => item.sales)
+    );
 
     return (
       <View style={styles.barChartContainer}>
@@ -118,7 +125,10 @@ export default function Sales() {
   const renderPieChart = () => {
     if (!reportData?.sellChartData) return null;
 
-    const total = reportData.sellChartData.reduce((sum, item) => sum + item.sales, 0);
+    const total = reportData.sellChartData.reduce(
+      (sum, item) => sum + item.sales,
+      0
+    );
     const colors = getChartColors();
 
     return (
@@ -183,11 +193,11 @@ export default function Sales() {
             <View
               style={[
                 styles.salesBadge,
-                { backgroundColor: isTop ? '#10b981' : '#ef4444' },
+                { backgroundColor: isTop ? "#10b981" : "#ef4444" },
               ]}
             >
               <Ionicons
-                name={isTop ? 'trending-up' : 'trending-down'}
+                name={isTop ? "trending-up" : "trending-down"}
                 size={16}
                 color="white"
               />
@@ -201,7 +211,7 @@ export default function Sales() {
 
   if (loading) {
     return (
-      < >
+      <>
         <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3b82f6" />
@@ -226,7 +236,10 @@ export default function Sales() {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Total Revenue Card */}
         <View style={styles.revenueCard}>
           <View style={styles.revenueIcon}>
@@ -280,34 +293,34 @@ export default function Sales() {
               <TouchableOpacity
                 style={[
                   styles.toggleButton,
-                  chartType === 'bar' && styles.toggleButtonActive,
+                  chartType === "bar" && styles.toggleButtonActive,
                 ]}
-                onPress={() => setChartType('bar')}
+                onPress={() => setChartType("bar")}
               >
                 <Ionicons
                   name="bar-chart"
                   size={20}
-                  color={chartType === 'bar' ? 'white' : '#6b7280'}
+                  color={chartType === "bar" ? "white" : "#6b7280"}
                 />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.toggleButton,
-                  chartType === 'pie' && styles.toggleButtonActive,
+                  chartType === "pie" && styles.toggleButtonActive,
                 ]}
-                onPress={() => setChartType('pie')}
+                onPress={() => setChartType("pie")}
               >
                 <Ionicons
                   name="pie-chart"
                   size={20}
-                  color={chartType === 'pie' ? 'white' : '#6b7280'}
+                  color={chartType === "pie" ? "white" : "#6b7280"}
                 />
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.chartCard}>
-            {chartType === 'bar' ? renderBarChart() : renderPieChart()}
+            {chartType === "bar" ? renderBarChart() : renderPieChart()}
           </View>
         </View>
 
@@ -332,7 +345,8 @@ export default function Sales() {
             <Ionicons name="alert-circle" size={24} color="#ef4444" />
             <Text style={styles.sectionTitle}>Least Selling Products</Text>
           </View>
-          {reportData?.least5Products && reportData.least5Products.length > 0 ? (
+          {reportData?.least5Products &&
+          reportData.least5Products.length > 0 ? (
             renderProductList(reportData.least5Products, false)
           ) : (
             <View style={styles.emptyState}>
@@ -347,51 +361,50 @@ export default function Sales() {
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
   },
 
   // Loading
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6b7280',
+    color: "#6b7280",
   },
 
   // Header
   header: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerTextContainer: {
     marginLeft: 12,
   },
   headerTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: "bold",
+    color: "#1f2937",
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: "#6b7280",
     marginTop: 2,
   },
 
@@ -401,13 +414,13 @@ const styles = StyleSheet.create({
 
   // Revenue Card
   revenueCard: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    backgroundColor: "white",
     margin: 20,
     marginBottom: 16,
     padding: 20,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -417,29 +430,29 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#d1fae5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#d1fae5",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 16,
   },
   revenueContent: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   revenueLabel: {
     fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
+    color: "#6b7280",
+    fontWeight: "500",
   },
   revenueValue: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#059669',
+    fontWeight: "bold",
+    color: "#059669",
     marginTop: 4,
   },
   revenuePeriod: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: "#9ca3af",
     marginTop: 2,
   },
 
@@ -450,8 +463,8 @@ const styles = StyleSheet.create({
   },
   filterLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: "600",
+    color: "#374151",
     marginBottom: 12,
   },
   filterScroll: {
@@ -461,21 +474,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: "#e5e7eb",
   },
   filterButtonActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: "#3b82f6",
+    borderColor: "#3b82f6",
   },
   filterButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontWeight: "600",
+    color: "#6b7280",
   },
   filterButtonTextActive: {
-    color: 'white',
+    color: "white",
   },
 
   // Chart Section
@@ -483,15 +496,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     marginBottom: 16,
   },
   chartTypeToggle: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    backgroundColor: "white",
     borderRadius: 8,
     padding: 4,
     gap: 4,
@@ -501,14 +514,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   toggleButtonActive: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: "#3b82f6",
   },
   chartCard: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     marginHorizontal: 20,
     padding: 20,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -517,64 +530,64 @@ const styles = StyleSheet.create({
 
   // Bar Chart
   barChartContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-end",
     height: 200,
     paddingTop: 20,
   },
   barChartItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 4,
   },
   barWrapper: {
     flex: 1,
-    width: '100%',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    width: "100%",
+    justifyContent: "flex-end",
+    alignItems: "center",
     marginBottom: 8,
   },
   bar: {
-    width: '100%',
+    width: "100%",
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     minHeight: 20,
   },
   barValue: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: "bold",
+    color: "#1f2937",
     marginBottom: 4,
   },
   barLabel: {
     fontSize: 11,
-    color: '#6b7280',
-    textAlign: 'center',
+    color: "#6b7280",
+    textAlign: "center",
     marginTop: 4,
   },
 
   // Pie Chart
   pieChartContainer: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   pieChart: {
     width: 180,
     height: 180,
     borderRadius: 90,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 24,
   },
   pieSegment: {
-    width: '100%',
+    width: "100%",
   },
   pieLegend: {
-    width: '100%',
+    width: "100%",
     gap: 12,
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   legendColor: {
     width: 16,
@@ -584,19 +597,19 @@ const styles = StyleSheet.create({
   },
   legendText: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   legendName: {
     fontSize: 14,
-    color: '#1f2937',
-    fontWeight: '500',
+    color: "#1f2937",
+    fontWeight: "500",
   },
   legendValue: {
     fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '600',
+    color: "#6b7280",
+    fontWeight: "600",
   },
 
   // Section
@@ -605,15 +618,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
     gap: 8,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: "bold",
+    color: "#1f2937",
   },
 
   // Product List
@@ -621,12 +634,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   productCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
     padding: 16,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -636,33 +649,33 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   rankNumber: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: "bold",
+    color: "#1f2937",
   },
   productInfo: {
     flex: 1,
   },
   productName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: "600",
+    color: "#1f2937",
     marginBottom: 2,
   },
   productBarcode: {
     fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'monospace',
+    color: "#6b7280",
+    fontFamily: "monospace",
   },
   salesBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -670,18 +683,18 @@ const styles = StyleSheet.create({
   },
   salesCount: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
   },
 
   // Empty State
   emptyState: {
     padding: 32,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: "#9ca3af",
   },
 
   bottomSpacing: {

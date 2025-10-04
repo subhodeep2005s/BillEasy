@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRouter } from "expo-router";
+import * as secureStore from "expo-secure-store";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,7 +19,7 @@ import {
 export const options = {
   headerShown: false,
 };
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 type CartItem = {
   barcode: string;
@@ -27,15 +28,15 @@ type CartItem = {
   description?: string | null;
 };
 
-type PaymentMode = 'Cash' | 'Card' | 'UPI';
+type PaymentMode = "Cash" | "Card" | "UPI";
 
 export default function Cart() {
-const navigation = useNavigation();
-useLayoutEffect(() => {
-  navigation.setOptions({
-    headerShown: false,
-  });
-}, [navigation]);
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ useLayoutEffect(() => {
   const [cartId, setCartId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const paymentOptions: PaymentMode[] = ['Cash', 'Card', 'UPI'];
+  const paymentOptions: PaymentMode[] = ["Cash", "Card", "UPI"];
 
   const loadCart = async () => {
     try {
@@ -67,7 +68,7 @@ useLayoutEffect(() => {
 
   const handleRemove = async (barcode: string) => {
     try {
-      const updatedCart = cartItems.filter(item => item.barcode !== barcode);
+      const updatedCart = cartItems.filter((item) => item.barcode !== barcode);
       setCartItems(updatedCart);
       await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
     } catch (error) {
@@ -82,17 +83,24 @@ useLayoutEffect(() => {
   // Step 1: Proceed-cart
   const handleCheckout = async () => {
     try {
-      const barcodes = cartItems.map(item => item.barcode);
+      const token = await secureStore.getItemAsync("token");
+      const barcodes = cartItems.map((item) => item.barcode);
       if (barcodes.length === 0) {
         Alert.alert("Error", "Cart is empty");
         return;
       }
 
-      const response = await fetch("https://erp-pos-backend.onrender.com/proceed-cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barcodes }),
-      });
+      const response = await fetch(
+        "https://erp-pos-backend.onrender.com/product/proceed-cart",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ barcodes }),
+        }
+      );
 
       const result = await response.json();
       console.log("Proceed cart result:", result);
@@ -124,11 +132,19 @@ useLayoutEffect(() => {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch("https://erp-pos-backend.onrender.com/finalize-sale", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerName, customerPhone, paymentMode, cartId }),
-      });
+      const response = await fetch(
+        "https://erp-pos-backend.onrender.com/finalize-sale",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerName,
+            customerPhone,
+            paymentMode,
+            cartId,
+          }),
+        }
+      );
 
       const result = await response.json();
       console.log(JSON.stringify(result.bill));
@@ -137,7 +153,7 @@ useLayoutEffect(() => {
         await AsyncStorage.removeItem("cart");
         setCartItems([]);
         setModalVisible(false);
-        
+
         // Reset form
         setCustomerName("");
         setCustomerPhone("");
@@ -162,30 +178,44 @@ useLayoutEffect(() => {
     const isSelected = paymentMode === option;
     const getIcon = () => {
       switch (option) {
-        case 'Cash': return 'cash-outline';
-        case 'Card': return 'card-outline';
-        case 'UPI': return 'phone-portrait-outline';
-        default: return 'cash-outline';
+        case "Cash":
+          return "cash-outline";
+        case "Card":
+          return "card-outline";
+        case "UPI":
+          return "phone-portrait-outline";
+        default:
+          return "cash-outline";
       }
     };
 
     return (
       <TouchableOpacity
         key={option}
-        style={[styles.paymentOption, isSelected && styles.paymentOptionSelected]}
+        style={[
+          styles.paymentOption,
+          isSelected && styles.paymentOptionSelected,
+        ]}
         onPress={() => setPaymentMode(option)}
       >
         <View style={styles.paymentOptionContent}>
-          <Ionicons 
-            name={getIcon()} 
-            size={24} 
-            color={isSelected ? '#007bff' : '#666'} 
+          <Ionicons
+            name={getIcon()}
+            size={24}
+            color={isSelected ? "#007bff" : "#666"}
           />
-          <Text style={[styles.paymentOptionText, isSelected && styles.paymentOptionTextSelected]}>
+          <Text
+            style={[
+              styles.paymentOptionText,
+              isSelected && styles.paymentOptionTextSelected,
+            ]}
+          >
             {option}
           </Text>
         </View>
-        <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
+        <View
+          style={[styles.radioButton, isSelected && styles.radioButtonSelected]}
+        >
           {isSelected && <View style={styles.radioButtonInner} />}
         </View>
       </TouchableOpacity>
@@ -195,7 +225,9 @@ useLayoutEffect(() => {
   const renderItem = ({ item }: { item: CartItem }) => (
     <View style={styles.item}>
       <View style={styles.itemInfo}>
-        <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.name} numberOfLines={2}>
+          {item.name}
+        </Text>
         <Text style={styles.barcode}>#{item.barcode}</Text>
         <Text style={styles.price}>₹{Number(item.price).toFixed(2)}</Text>
       </View>
@@ -208,7 +240,10 @@ useLayoutEffect(() => {
     </View>
   );
 
-  const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  const total = cartItems.reduce(
+    (sum, item) => sum + Number(item.price || 0),
+    0
+  );
 
   return (
     <>
@@ -231,9 +266,9 @@ useLayoutEffect(() => {
       ) : (
         <>
           <Text style={styles.itemCount}>
-            {cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in cart
+            {cartItems.length} item{cartItems.length !== 1 ? "s" : ""} in cart
           </Text>
-          
+
           <FlatList
             data={cartItems}
             keyExtractor={(item, index) => item.barcode + index}
@@ -253,7 +288,12 @@ useLayoutEffect(() => {
               style={styles.checkoutButton}
               onPress={handleCheckout}
             >
-              <Ionicons name="arrow-forward" size={20} color="white" style={{ marginRight: 8 }} />
+              <Ionicons
+                name="arrow-forward"
+                size={20}
+                color="white"
+                style={{ marginRight: 8 }}
+              />
               <Text style={styles.checkoutText}>Proceed to Checkout</Text>
             </TouchableOpacity>
           </View>
@@ -266,7 +306,7 @@ useLayoutEffect(() => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Customer Details</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
               >
@@ -276,7 +316,12 @@ useLayoutEffect(() => {
 
             <View style={styles.formContainer}>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Customer Name"
@@ -287,7 +332,12 @@ useLayoutEffect(() => {
               </View>
 
               <View style={styles.inputContainer}>
-                <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="call-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Customer Phone"
@@ -306,23 +356,28 @@ useLayoutEffect(() => {
               <View style={styles.orderSummary}>
                 <Text style={styles.orderSummaryTitle}>Order Summary</Text>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryText}>Items: {cartItems.length}</Text>
+                  <Text style={styles.summaryText}>
+                    Items: {cartItems.length}
+                  </Text>
                   <Text style={styles.summaryAmount}>${total.toFixed(2)}</Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.cancelBtn} 
+              <TouchableOpacity
+                style={styles.cancelBtn}
                 onPress={() => setModalVisible(false)}
                 disabled={isSubmitting}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]} 
+
+              <TouchableOpacity
+                style={[
+                  styles.submitBtn,
+                  isSubmitting && styles.submitBtnDisabled,
+                ]}
                 onPress={finalizeSale}
                 disabled={isSubmitting}
               >
@@ -330,7 +385,12 @@ useLayoutEffect(() => {
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <>
-                    <Ionicons name="checkmark" size={20} color="white" style={{ marginRight: 8 }} />
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color="white"
+                      style={{ marginRight: 8 }}
+                    />
                     <Text style={styles.submitBtnText}>Complete Sale</Text>
                   </>
                 )}
@@ -344,64 +404,64 @@ useLayoutEffect(() => {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#f8fafc" 
+  container: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     marginBottom: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
   },
-  title: { 
-    fontSize: 24, 
-    fontWeight: "bold", 
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
     marginLeft: 12,
-    color: '#1a202c'
+    color: "#1a202c",
   },
   itemCount: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     paddingHorizontal: 20,
     paddingVertical: 8,
-    fontWeight: '500'
+    fontWeight: "500",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666'
+    color: "#666",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 40,
   },
-  empty: { 
-    fontSize: 20, 
-    fontWeight: '600',
+  empty: {
+    fontSize: 20,
+    fontWeight: "600",
     color: "#666",
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 16,
-    color: '#999',
+    color: "#999",
     marginTop: 8,
-    textAlign: 'center'
+    textAlign: "center",
   },
   item: {
     flexDirection: "row",
@@ -411,39 +471,39 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 4,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
   },
-  itemInfo: { 
+  itemInfo: {
     flex: 1,
-    paddingRight: 12 
+    paddingRight: 12,
   },
-  name: { 
-    fontSize: 16, 
+  name: {
+    fontSize: 16,
     fontWeight: "600",
-    color: '#1a202c',
-    lineHeight: 22
+    color: "#1a202c",
+    lineHeight: 22,
   },
-  barcode: { 
-    fontSize: 13, 
-    color: "#666", 
+  barcode: {
+    fontSize: 13,
+    color: "#666",
     marginTop: 4,
-    fontFamily: 'monospace'
+    fontFamily: "monospace",
   },
-  price: { 
-    fontSize: 18, 
-    fontWeight: "bold", 
-    marginTop: 6, 
-    color: "#007bff" 
+  price: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 6,
+    color: "#007bff",
   },
-  deleteButton: { 
-    backgroundColor: "#ef4444", 
-    padding: 12, 
+  deleteButton: {
+    backgroundColor: "#ef4444",
+    padding: 12,
     borderRadius: 10,
-    shadowColor: '#ef4444',
+    shadowColor: "#ef4444",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -458,45 +518,45 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 10,
   },
   totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   totalLabel: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#666'
+    fontWeight: "500",
+    color: "#666",
   },
-  totalText: { 
-    fontSize: 24, 
-    fontWeight: "bold", 
-    color: "#16a34a" 
+  totalText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#16a34a",
   },
   checkoutButton: {
     backgroundColor: "#007bff",
     paddingVertical: 16,
     borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#007bff',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#007bff",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
-  checkoutText: { 
-    color: "white", 
-    fontSize: 16, 
-    fontWeight: "600" 
+  checkoutText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 
   // Modal styles
@@ -509,20 +569,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0'
+    borderBottomColor: "#e2e8f0",
   },
-  modalTitle: { 
-    fontSize: 20, 
+  modalTitle: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: '#1a202c'
+    color: "#1a202c",
   },
   closeButton: {
     padding: 4,
@@ -531,14 +591,14 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#e2e8f0",
     borderRadius: 12,
     marginBottom: 16,
     paddingHorizontal: 12,
-    backgroundColor: '#f8fafc'
+    backgroundColor: "#f8fafc",
   },
   inputIcon: {
     marginRight: 12,
@@ -547,12 +607,12 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     fontSize: 16,
-    color: '#1a202c'
+    color: "#1a202c",
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a202c',
+    fontWeight: "600",
+    color: "#1a202c",
     marginBottom: 12,
     marginTop: 8,
   },
@@ -560,110 +620,110 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   paymentOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: "#e2e8f0",
     borderRadius: 12,
     marginBottom: 12,
-    backgroundColor: '#fff'
+    backgroundColor: "#fff",
   },
   paymentOptionSelected: {
-    borderColor: '#007bff',
-    backgroundColor: '#f0f8ff'
+    borderColor: "#007bff",
+    backgroundColor: "#f0f8ff",
   },
   paymentOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   paymentOptionText: {
     fontSize: 16,
     marginLeft: 12,
-    color: '#666',
-    fontWeight: '500'
+    color: "#666",
+    fontWeight: "500",
   },
   paymentOptionTextSelected: {
-    color: '#007bff',
-    fontWeight: '600'
+    color: "#007bff",
+    fontWeight: "600",
   },
   radioButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   radioButtonSelected: {
-    borderColor: '#007bff',
+    borderColor: "#007bff",
   },
   radioButtonInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
   },
   orderSummary: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
     padding: 16,
     borderRadius: 12,
     marginTop: 8,
   },
   orderSummaryTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a202c',
+    fontWeight: "600",
+    color: "#1a202c",
     marginBottom: 8,
   },
   summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   summaryText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   summaryAmount: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#16a34a',
+    fontWeight: "bold",
+    color: "#16a34a",
   },
-  modalActions: { 
-    flexDirection: "row", 
+  modalActions: {
+    flexDirection: "row",
     padding: 20,
     gap: 12,
   },
-  cancelBtn: { 
+  cancelBtn: {
     flex: 1,
-    backgroundColor: "#6b7280", 
-    paddingVertical: 16, 
+    backgroundColor: "#6b7280",
+    paddingVertical: 16,
     borderRadius: 12,
-    alignItems: 'center'
+    alignItems: "center",
   },
   cancelBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600'
+    fontWeight: "600",
   },
-  submitBtn: { 
+  submitBtn: {
     flex: 2,
-    backgroundColor: "#16a34a", 
-    paddingVertical: 16, 
+    backgroundColor: "#16a34a",
+    paddingVertical: 16,
     borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center'
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   submitBtnDisabled: {
-    backgroundColor: '#9ca3af'
+    backgroundColor: "#9ca3af",
   },
   submitBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600'
-  }
+    fontWeight: "600",
+  },
 });
