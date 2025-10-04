@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useNavigation, useRouter } from "expo-router";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,8 +14,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
+export const options = {
+  headerShown: false,
+};
 const { width } = Dimensions.get('window');
 
 type CartItem = {
@@ -28,6 +30,12 @@ type CartItem = {
 type PaymentMode = 'Cash' | 'Card' | 'UPI';
 
 export default function Cart() {
+const navigation = useNavigation();
+useLayoutEffect(() => {
+  navigation.setOptions({
+    headerShown: false,
+  });
+}, [navigation]);
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,7 +211,7 @@ export default function Cart() {
   const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
       <View style={styles.header}>
         <Ionicons name="cart" size={28} color="#007bff" />
         <Text style={styles.title}>Your Cart</Text>
@@ -331,7 +339,7 @@ export default function Cart() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
 

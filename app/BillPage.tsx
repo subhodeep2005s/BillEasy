@@ -1,28 +1,34 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useRef } from "react";
+import React, { useLayoutEffect, useRef } from "react";
 import { Alert, Dimensions, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import ViewShot from "react-native-view-shot";
 
 const { width } = Dimensions.get('window');
 
 export default function BillPage() {
+
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
   const { bill } = useLocalSearchParams<{ bill: string }>();
   const parsedBill = bill ? JSON.parse(bill) : null;
   const ViewShotRef = useRef<ViewShot | null>(null);
 
   if (!parsedBill) {
     return (
-      <SafeAreaView style={styles.container}>
+      <>
         <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
         <View style={styles.emptyContainer}>
           <Ionicons name="document-outline" size={80} color="#d1d5db" />
           <Text style={styles.emptyTitle}>No Bill Data</Text>
           <Text style={styles.emptySubtitle}>Unable to load invoice information</Text>
         </View>
-      </SafeAreaView>
+      </>
     );
   }
 
@@ -50,7 +56,7 @@ export default function BillPage() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
       <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
       
       {/* Header */}
@@ -191,7 +197,7 @@ export default function BillPage() {
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-    </SafeAreaView>
+    </>
   );
 }
 

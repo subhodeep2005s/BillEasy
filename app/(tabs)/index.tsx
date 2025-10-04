@@ -6,20 +6,20 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Link, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  Dimensions,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Modal from "react-native-modal";
-import ProductsList from "./components/ProductsList";
-import SearchBar from "./components/SearchBar";
-import PagesIcon from "./components/pagesIcon";
+import ProductsList from "../_components/ProductsList";
+import SearchBar from "../_components/SearchBar";
+// import PagesIcon from "./components/pagesIcon";
 
 const { width } = Dimensions.get('window');
 
@@ -363,7 +363,7 @@ export default function App() {
         </View>
       </View>
 
-      <PagesIcon/>
+      {/* <PagesIcon/> */}
 
       <SearchBar
         value={searchQuery}
@@ -681,9 +681,9 @@ const styles = StyleSheet.create({
 
   actionButtonsContainer: {
     position: 'absolute',
-    bottom: 30,
-    left: 20,
-    right: 20,
+    bottom: 90,
+    left: 120,
+    right: 120,
   },
   actionButton: {
     borderRadius: 16,

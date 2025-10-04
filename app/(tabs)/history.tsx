@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -172,18 +172,18 @@ export default function History() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <>
         <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3b82f6" />
           <Text style={styles.loadingText}>Loading sales history...</Text>
         </View>
-      </SafeAreaView>
+            </>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
       <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
       
       {/* Header */}
@@ -210,8 +210,10 @@ export default function History() {
         <View style={styles.statItem}>
           <Ionicons name="cart" size={24} color="#3b82f6" />
           <View style={styles.statContent}>
-            <Text style={styles.statLabel}>Transactions</Text>
-            <Text style={styles.statValue}>{noOfSales}</Text>
+            <Text style={styles.statLabel}>Sales</Text>
+            <Text style={styles.statValue}>
+              {groupedCarts.filter(cart => cart.payment_mode.toLowerCase() !== 'pending').length}
+            </Text>
           </View>
         </View>
       </View>
@@ -261,7 +263,7 @@ export default function History() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </SafeAreaView>
+    </>
   );
 }
 
