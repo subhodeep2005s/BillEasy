@@ -44,6 +44,4 @@ const styles = StyleSheet.create({
   },
 });
 
-
-
 // http://192.168.0.101:8000/search-product

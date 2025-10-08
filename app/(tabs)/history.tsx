@@ -15,6 +15,8 @@ import {
 import Svg, { Circle, G, Text as SvgText } from "react-native-svg";
 
 const { width } = Dimensions.get("window");
+const apiUrl = "https://erp-pos-backend.onrender.com";
+// const apiUrl = "http://192.168.0.103:8080";
 
 type SalesItem = {
   cart_id: string;
@@ -58,17 +60,14 @@ export default function History() {
         throw new Error("No access token found");
       }
       setLoading(true);
-      const response = await fetch(
-        "https://erp-pos-backend.onrender.com/product/sales-report",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ days }),
-        }
-      );
+      const response = await fetch(`${apiUrl}/product/sales-report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ days }),
+      });
 
       const data = await response.json();
 

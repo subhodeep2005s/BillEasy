@@ -33,7 +33,9 @@ type Product = {
   createdAt?: string;
 };
 
-const apiUrl = "http://192.168.0.103:8080";
+const apiUrl = "https://erp-pos-backend.onrender.com";
+// const apiUrl = "http://192.168.0.103:8080";
+
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
@@ -89,13 +91,12 @@ export default function App() {
       if (!token) {
         throw new Error("No access token found");
       }
-      const response = await fetch(`${apiUrl}/product/show-product`, {
+      const response = await fetch(`${apiUrl}/product/show-product/${query}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ productKeywords: query }),
       });
 
       const result = await response.json();
@@ -119,13 +120,12 @@ export default function App() {
         throw new Error("No access token found");
       }
       setLoading(true);
-      const response = await fetch(`${apiUrl}/product/show-product`, {
-        method: "POST",
+      const response = await fetch(`${apiUrl}/product/show-product/*`, {
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ productKeywords: "" }),
       });
       const result = await response.json();
 
@@ -241,22 +241,19 @@ export default function App() {
         }
         console.log("Using token:", token);
 
-        const response = await fetch(
-          "https://erp-pos-backend.onrender.com/product/add-product",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              barcode,
-              name: existingProduct.name,
-              price: Number(formData.price),
-              quantity: Number(formData.stock),
-            }),
-          }
-        );
+        const response = await fetch(`${apiUrl}/product/add-product`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            barcode,
+            name: existingProduct.name,
+            price: Number(formData.price),
+            quantity: Number(formData.stock),
+          }),
+        });
         const result = await response.json();
         if (response.ok) {
           Alert.alert("Success", "Product stock updated successfully!");
@@ -286,23 +283,20 @@ export default function App() {
         if (!token) {
           throw new Error("No access token found");
         }
-        const response = await fetch(
-          "https://erp-pos-backend.onrender.com/product/add-product",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              barcode,
-              name: formData.name.trim(),
-              price: Number(formData.price),
-              quantity: Number(formData.stock),
-              description: formData.description.trim(),
-            }),
-          }
-        );
+        const response = await fetch(`${apiUrl}/product/add-product`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            barcode,
+            name: formData.name.trim(),
+            price: Number(formData.price),
+            quantity: Number(formData.stock),
+            description: formData.description.trim(),
+          }),
+        });
         const result = await response.json();
         if (response.ok) {
           Alert.alert(
@@ -327,17 +321,14 @@ export default function App() {
 
     try {
       const token = await SecureStore.getItemAsync("accessToken");
-      const response = await fetch(
-        "https://erp-pos-backend.onrender.com/product/checkout",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ barcode }),
-        }
-      );
+      const response = await fetch(`${apiUrl}/product/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ barcode }),
+      });
       const result = await response.json();
 
       if (response.ok) {

@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRouter } from "expo-router";
-import * as secureStore from "expo-secure-store";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -83,7 +83,13 @@ export default function Cart() {
   // Step 1: Proceed-cart
   const handleCheckout = async () => {
     try {
-      const token = await secureStore.getItemAsync("token");
+      const token = await SecureStore.getItemAsync("accessToken");
+      console.log("Token:", token);
+
+      if (!token) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
       const barcodes = cartItems.map((item) => item.barcode);
       if (barcodes.length === 0) {
         Alert.alert("Error", "Cart is empty");
