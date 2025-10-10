@@ -15,7 +15,7 @@ import {
 // 192.168.0.103:8081
 
 const { width } = Dimensions.get("window");
-const apiUrl = "https://erp-pos-backend.onrender.com";
+const apiUrl = "https://point-of-sale-2.onrender.com";
 
 // const apiUrl = "http://192.168.0.103:8080";
 

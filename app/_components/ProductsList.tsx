@@ -13,8 +13,8 @@ type Product = {
   _id?: string;
   barcode: string;
   name: string;
-  price: number;
-  stock: number;
+  price: number | string; // Changed: Accept both
+  stock: number | string; // Changed: Accept both
   category?: string;
 };
 
@@ -24,35 +24,53 @@ type Props = {
 };
 
 export default function ProductsList({ products, loading }: Props) {
-  const renderItem = ({ item }: { item: Product }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="cube-outline" size={16} color="#3b82f6" />
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={styles.barcode}>#{item.barcode}</Text>
-        </View>
-      </View>
+  const renderItem = ({ item }: { item: Product }) => {
+    // Normalize values for display
+    const price =
+      typeof item.price === "string" ? parseFloat(item.price) : item.price;
+    const stock =
+      typeof item.stock === "string" ? parseInt(item.stock, 10) : item.stock;
 
-      <View style={styles.cardFooter}>
-        <View style={styles.stockBadge}>
-          <Ionicons name="layers-outline" size={12} color="#059669" />
-          <Text style={styles.stockText}>{item.stock}</Text>
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="cube-outline" size={16} color="#3b82f6" />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={styles.barcode}>#{item.barcode}</Text>
+          </View>
         </View>
-        <Text style={styles.price}>₹{item.price}</Text>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.stockBadge}>
+            <Ionicons name="layers-outline" size={12} color="#059669" />
+            <Text style={styles.stockText}>{stock}</Text>
+          </View>
+          <Text style={styles.price}>₹{price.toFixed(2)}</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#3b82f6" />
         <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="cube-outline" size={64} color="#d1d5db" />
+        <Text style={styles.emptyText}>No products found</Text>
+        <Text style={styles.emptySubtext}>Scan a barcode to add products</Text>
       </View>
     );
   }
@@ -207,5 +225,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     fontWeight: "500",
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    paddingHorizontal: 40,
+  },
+
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#4b5563",
+    marginTop: 16,
+  },
+
+  emptySubtext: {
+    fontSize: 14,
+    color: "#9ca3af",
+    marginTop: 8,
+    textAlign: "center",
   },
 });

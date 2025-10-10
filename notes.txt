@@ -25,16 +25,17 @@ type Product = {
   _id?: string;
   barcode: string;
   name: string;
-  price: number | string;
-  stock: number | string;
+  price: number;
+  stock: number;
   category?: string;
   description?: string;
   createdAt?: string;
-  productImage?: string;
-  brand?: string;
 };
 
-const apiUrl = "https://point-of-sale-2.onrender.com";
+const apiUrl = "https://erp-pos-backend.onrender.com";
+const PRODUCTS_CACHE_KEY = "cached_products";
+const CACHE_TIMESTAMP_KEY = "products_cache_timestamp";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -44,28 +45,78 @@ export default function App() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [existingProduct, setExistingProduct] = useState<Product | null>(null);
-
-  // Single state for form
-  const [productForm, setProductForm] = useState({
+  const [formData, setFormData] = useState({
     name: "",
     price: "",
     stock: "",
     description: "",
-    category: "",
-    brand: "",
   });
-
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [isSearchingLocally, setIsSearchingLocally] = useState(false);
 
-  // Helper function to update form with logging
-  const updateProductForm = (field: string, value: string) => {
-    setProductForm((prev) => ({ ...prev, [field]: value }));
-    console.log(`Updated ${field}:`, value);
-    console.log("Current form state:", { ...productForm, [field]: value });
+  // Load products from cache
+  const loadProductsFromCache = async (): Promise<Product[] | null> => {
+    try {
+      const cachedData = await AsyncStorage.getItem(PRODUCTS_CACHE_KEY);
+      const cacheTimestamp = await AsyncStorage.getItem(CACHE_TIMESTAMP_KEY);
+
+      if (cachedData && cacheTimestamp) {
+        const timestamp = parseInt(cacheTimestamp, 10);
+        const now = Date.now();
+
+        // Check if cache is still valid
+        if (now - timestamp < CACHE_DURATION) {
+          console.log("Loading products from cache");
+          return JSON.parse(cachedData);
+        } else {
+          console.log("Cache expired");
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error loading products from cache:", error);
+      return null;
+    }
+  };
+
+  // Save products to cache
+  const saveProductsToCache = async (products: Product[]) => {
+    try {
+      await AsyncStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(products));
+      await AsyncStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      console.log("Products saved to cache");
+    } catch (error) {
+      console.error("Error saving products to cache:", error);
+    }
+  };
+
+  // Local search function
+  const searchLocalProducts = (
+    query: string,
+    productsList: Product[]
+  ): Product[] => {
+    if (!query.trim()) {
+      return productsList;
+    }
+
+    const searchTerm = query.toLowerCase().trim();
+
+    return productsList.filter((product) => {
+      const nameMatch = product.name.toLowerCase().includes(searchTerm);
+      const barcodeMatch = product.barcode.toLowerCase().includes(searchTerm);
+      const categoryMatch = product.category
+        ?.toLowerCase()
+        .includes(searchTerm);
+      const descriptionMatch = product.description
+        ?.toLowerCase()
+        .includes(searchTerm);
+
+      return nameMatch || barcodeMatch || categoryMatch || descriptionMatch;
+    });
   };
 
   const loadCartCount = async () => {
@@ -89,38 +140,93 @@ export default function App() {
     }, [])
   );
 
-  const handleSearch = (query: string) => {
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
+    console.log("Searching for:", query);
 
     if (!query.trim()) {
       setFilteredProducts(products);
+      setIsSearchingLocally(false);
       return;
     }
 
-    const lowercaseQuery = query.toLowerCase();
-    const filtered = products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(lowercaseQuery) ||
-        product.barcode.includes(query)
-    );
+    // First, try local search
+    setIsSearchingLocally(true);
+    const localResults = searchLocalProducts(query, products);
+    setFilteredProducts(localResults);
 
-    setFilteredProducts(filtered);
+    // If local results are found, don't make API call
+    if (localResults.length > 0) {
+      console.log("Found results locally:", localResults.length);
+      return;
+    }
+
+    // If no local results and query is specific enough, try API search
+    if (query.trim().length >= 3) {
+      try {
+        const token = await SecureStore.getItemAsync("accessToken");
+        if (!token) {
+          throw new Error("No access token found");
+        }
+
+        setIsSearchingLocally(false);
+        const response = await fetch(
+          `${apiUrl}/product/show-product/${query}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const result = await response.json();
+        console.log("API search result:", result);
+
+        if (response.ok && Array.isArray(result.products)) {
+          setFilteredProducts(result.products);
+        } else {
+          setFilteredProducts([]);
+        }
+      } catch (error) {
+        console.error("API search error:", error);
+        setFilteredProducts([]);
+      }
+    }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (useCache: boolean = true) => {
+    try {
+      // Try to load from cache first
+      if (useCache) {
+        const cachedProducts = await loadProductsFromCache();
+        if (cachedProducts && cachedProducts.length > 0) {
+          setProducts(cachedProducts);
+          setFilteredProducts(cachedProducts);
+          setLoading(false);
+          // Still fetch from API in background to update cache
+          fetchProductsFromAPI();
+          return;
+        }
+      }
+
+      // If no cache or cache invalid, fetch from API
+      await fetchProductsFromAPI();
+    } catch (error) {
+      console.error("Error in fetchProducts:", error);
+      setLoading(false);
+    }
+  };
+
+  const fetchProductsFromAPI = async () => {
     try {
       const token = await SecureStore.getItemAsync("accessToken");
-
       if (!token) {
-        console.log("No access token found");
-        Alert.alert("Authentication Error", "Please login again");
-        setLoading(false);
-        return;
+        throw new Error("No access token found");
       }
 
       setLoading(true);
-      console.log("Fetching products with token");
-
       const response = await fetch(`${apiUrl}/product/show-product/*`, {
         method: "GET",
         headers: {
@@ -128,48 +234,32 @@ export default function App() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const result = await response.json();
 
       if (response.ok && Array.isArray(result.products)) {
-        const normalizedProducts = result.products.map((product: any) => ({
-          ...product,
-          price:
-            typeof product.price === "string"
-              ? parseFloat(product.price)
-              : product.price,
-          stock:
-            typeof product.stock === "string"
-              ? parseInt(product.stock, 10)
-              : product.stock,
-        }));
-
-        const sortedProducts = normalizedProducts.sort(
-          (a: Product, b: Product) => {
-            if (a.createdAt && b.createdAt) {
-              return (
-                new Date(b.createdAt).getTime() -
-                new Date(a.createdAt).getTime()
-              );
-            } else if (a._id && b._id) {
-              return b._id.localeCompare(a._id);
-            } else {
-              return b.name.localeCompare(a.name);
-            }
+        const sortedProducts = (result.products as Product[]).sort((a, b) => {
+          if (a.createdAt && b.createdAt) {
+            return (
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          } else if (a._id && b._id) {
+            return b._id.localeCompare(a._id);
+          } else {
+            return b.name.localeCompare(a.name);
           }
-        );
+        });
 
-        console.log("Products fetched:", sortedProducts.length);
         setProducts(sortedProducts);
         setFilteredProducts(sortedProducts);
+
+        // Save to cache
+        await saveProductsToCache(sortedProducts);
       } else {
-        console.log("No products in response or invalid format");
         setProducts([]);
         setFilteredProducts([]);
       }
     } catch (error) {
-      console.error("Error fetching products:", error);
-      Alert.alert("Error", "Failed to fetch products. Please try again.");
+      console.error("Error fetching products from API:", error);
       setProducts([]);
       setFilteredProducts([]);
     } finally {
@@ -178,21 +268,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    const initializeApp = async () => {
-      const token = await SecureStore.getItemAsync("accessToken");
-      console.log("Initial token check:", token ? "Token exists" : "No token");
-
-      if (token) {
-        await fetchProducts();
-      } else {
-        console.log("No token found on initialization");
-        setLoading(false);
-      }
-
-      await loadCartCount();
-    };
-
-    initializeApp();
+    fetchProducts(true);
+    loadCartCount();
   }, []);
 
   if (!permission) return <View />;
@@ -227,31 +304,20 @@ export default function App() {
   const handleAddBarcodeScanned = async ({ data }: { data: string }) => {
     setIsScanning(false);
     setBarcode(data);
-    console.log("Scanned barcode:", data);
 
+    // Check if product exists
     const product = products.find((p) => p.barcode === data);
     if (product) {
-      console.log("Existing product found:", product);
       setExistingProduct(product);
-      setProductForm({
+      setFormData({
         name: product.name,
         price: product.price.toString(),
         stock: "",
         description: product.description || "",
-        category: product.category || "",
-        brand: product.brand || "",
       });
     } else {
-      console.log("New product - no match found");
       setExistingProduct(null);
-      setProductForm({
-        name: "",
-        price: "",
-        stock: "",
-        description: "",
-        category: "",
-        brand: "",
-      });
+      setFormData({ name: "", price: "", stock: "", description: "" });
     }
 
     setModalVisible(true);
@@ -271,42 +337,17 @@ export default function App() {
   };
 
   const handleAddSubmit = async () => {
-    console.log("=== SUBMIT STARTED ===");
-    console.log("Current form state:", productForm);
-    console.log("Barcode:", barcode);
-    console.log("Is existing product:", !!existingProduct);
-
     if (existingProduct) {
-      // Update existing product
-      if (!productForm.price.trim() || !productForm.stock.trim()) {
-        console.log("Validation failed: Missing price or stock");
+      if (!formData.price.trim() || !formData.stock.trim()) {
         Alert.alert("Validation Error", "Please fill price and stock fields");
         return;
       }
 
       try {
         const token = await SecureStore.getItemAsync("accessToken");
-        console.log("Token retrieved:", token ? "Yes" : "No");
-
         if (!token) {
-          Alert.alert("Authentication Error", "Please login again");
-          return;
+          throw new Error("No access token found");
         }
-
-        const requestBody = {
-          barcode: barcode,
-          name: existingProduct.name,
-          price: parseFloat(productForm.price),
-          quantity: parseInt(productForm.stock, 10),
-          productImage:
-            existingProduct.productImage || "https://via.placeholder.com/150",
-          category: existingProduct.category || "General",
-          brand: existingProduct.brand || "Generic",
-        };
-
-        console.log("=== UPDATE REQUEST ===");
-        console.log("URL:", `${apiUrl}/product/add-product`);
-        console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
         const response = await fetch(`${apiUrl}/product/add-product`, {
           method: "POST",
@@ -314,85 +355,63 @@ export default function App() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            barcode,
+            name: existingProduct.name,
+            price: Number(formData.price),
+            quantity: Number(formData.stock),
+          }),
         });
-
-        console.log("Response status:", response.status);
         const result = await response.json();
-        console.log("Response data:", result);
-
         if (response.ok) {
           Alert.alert("Success", "Product stock updated successfully!");
-          await fetchProducts();
+          await fetchProducts(false); // Force refresh from API
         } else {
-          console.error("Update failed:", result);
           Alert.alert("Error", result.message || "Failed to update product");
         }
       } catch (error) {
-        console.error("Update error:", error);
+        console.error("Update product error:", error);
         Alert.alert("Network Error", "Failed to connect to server");
       } finally {
         resetModal();
       }
     } else {
-      // Add new product
       if (
-        !productForm.name.trim() ||
-        !productForm.price.trim() ||
-        !productForm.stock.trim()
+        !formData.name.trim() ||
+        !formData.price.trim() ||
+        !formData.stock.trim()
       ) {
-        console.log("Validation failed: Missing required fields");
-        console.log("Name:", productForm.name);
-        console.log("Price:", productForm.price);
-        console.log("Stock:", productForm.stock);
         Alert.alert("Validation Error", "Please fill all required fields");
         return;
       }
 
       try {
         const token = await SecureStore.getItemAsync("accessToken");
-        console.log("Token retrieved:", token ? "Yes" : "No");
-
         if (!token) {
-          Alert.alert("Authentication Error", "Please login again");
-          return;
+          throw new Error("No access token found");
         }
-
-        const requestBody = {
-          barcode: barcode,
-          name: productForm.name.trim(),
-          price: parseFloat(productForm.price),
-          quantity: parseInt(productForm.stock, 10),
-          productImage: "https://via.placeholder.com/150",
-          category: productForm.category?.trim() || "General",
-          brand: productForm.brand?.trim() || "Generic",
-        };
-
-        console.log("=== ADD NEW PRODUCT REQUEST ===");
-        console.log("URL:", `${apiUrl}/product/add-product`);
-        console.log("Request body:", JSON.stringify(requestBody, null, 2));
-
         const response = await fetch(`${apiUrl}/product/add-product`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            barcode,
+            name: formData.name.trim(),
+            price: Number(formData.price),
+            quantity: Number(formData.stock),
+            description: formData.description.trim(),
+          }),
         });
-
-        console.log("Response status:", response.status);
         const result = await response.json();
-        console.log("Response data:", result);
-
         if (response.ok) {
           Alert.alert(
             "Success",
             result.message || "Product added successfully!"
           );
-          await fetchProducts();
+          await fetchProducts(false); // Force refresh from API
         } else {
-          console.error("Add failed:", result);
           Alert.alert("Error", result.message || "Failed to add product");
         }
       } catch (error) {
@@ -409,11 +428,6 @@ export default function App() {
 
     try {
       const token = await SecureStore.getItemAsync("accessToken");
-      if (!token) {
-        Alert.alert("Authentication Error", "Please login again");
-        return;
-      }
-
       const response = await fetch(`${apiUrl}/product/checkout`, {
         method: "POST",
         headers: {
@@ -438,7 +452,7 @@ export default function App() {
         setCartItemCount(cart.length);
 
         Alert.alert("Success", "Product added to cart!");
-        await fetchProducts();
+        await fetchProducts(false); // Force refresh from API
       } else {
         Alert.alert("Error", result.message || "Failed to checkout product");
       }
@@ -451,19 +465,11 @@ export default function App() {
   };
 
   const resetModal = () => {
-    console.log("Resetting modal");
     setModalVisible(false);
     setScannedProduct(null);
     setExistingProduct(null);
     setBarcode("");
-    setProductForm({
-      name: "",
-      price: "",
-      stock: "",
-      description: "",
-      category: "",
-      brand: "",
-    });
+    setFormData({ name: "", price: "", stock: "", description: "" });
   };
 
   return (
@@ -520,7 +526,10 @@ export default function App() {
             onPress={() => setIsScanningCheckout(true)}
             activeOpacity={0.8}
           >
-            <Ionicons name="scan" size={32} color="white" />
+            <View style={styles.buttonContent}>
+              <Ionicons name="scan-outline" size={24} color="white" />
+              <Text style={styles.buttonText}>Scan Item</Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
@@ -673,8 +682,10 @@ export default function App() {
                       <TextInput
                         style={styles.input}
                         placeholder="Enter product name"
-                        value={productForm.name}
-                        onChangeText={(text) => updateProductForm("name", text)}
+                        value={formData.name}
+                        onChangeText={(text) =>
+                          setFormData({ ...formData, name: text })
+                        }
                         autoCapitalize="words"
                       />
                     </View>
@@ -692,9 +703,9 @@ export default function App() {
                         style={styles.input}
                         placeholder="0.00"
                         keyboardType="numeric"
-                        value={productForm.price}
+                        value={formData.price}
                         onChangeText={(text) =>
-                          updateProductForm("price", text)
+                          setFormData({ ...formData, price: text })
                         }
                       />
                     </View>
@@ -710,67 +721,29 @@ export default function App() {
                         style={styles.input}
                         placeholder="0"
                         keyboardType="numeric"
-                        value={productForm.stock}
+                        value={formData.stock}
                         onChangeText={(text) =>
-                          updateProductForm("stock", text)
+                          setFormData({ ...formData, stock: text })
                         }
                       />
                     </View>
                   </View>
 
                   {!existingProduct && (
-                    <>
-                      <View style={styles.inputRow}>
-                        <View
-                          style={[
-                            styles.inputContainer,
-                            { flex: 1, marginRight: 8 },
-                          ]}
-                        >
-                          <Text style={styles.inputLabel}>Category</Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="e.g., Electronics"
-                            value={productForm.category}
-                            onChangeText={(text) =>
-                              updateProductForm("category", text)
-                            }
-                          />
-                        </View>
-
-                        <View
-                          style={[
-                            styles.inputContainer,
-                            { flex: 1, marginLeft: 8 },
-                          ]}
-                        >
-                          <Text style={styles.inputLabel}>Brand</Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="e.g., Samsung"
-                            value={productForm.brand}
-                            onChangeText={(text) =>
-                              updateProductForm("brand", text)
-                            }
-                          />
-                        </View>
-                      </View>
-
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Description</Text>
-                        <TextInput
-                          style={[styles.input, styles.textArea]}
-                          placeholder="Enter product description (optional)"
-                          value={productForm.description}
-                          onChangeText={(text) =>
-                            updateProductForm("description", text)
-                          }
-                          multiline
-                          numberOfLines={4}
-                          textAlignVertical="top"
-                        />
-                      </View>
-                    </>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Description</Text>
+                      <TextInput
+                        style={[styles.input, styles.textArea]}
+                        placeholder="Enter product description (optional)"
+                        value={formData.description}
+                        onChangeText={(text) =>
+                          setFormData({ ...formData, description: text })
+                        }
+                        multiline
+                        numberOfLines={4}
+                        textAlignVertical="top"
+                      />
+                    </View>
                   )}
 
                   <TouchableOpacity

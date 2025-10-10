@@ -123,7 +123,7 @@ export default function Register() {
     setLoading(true);
     try {
       const response = await fetch(
-        "https://erp-pos-backend.onrender.com/auth/register",
+        "https://point-of-sale-2.onrender.com/auth/register",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

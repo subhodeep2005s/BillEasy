@@ -61,7 +61,7 @@ export default function SignIn() {
     try {
       setLoading(true);
       const response = await fetch(
-        "https://erp-pos-backend.onrender.com/auth/login",
+        "https://point-of-sale-2.onrender.com/auth/login",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

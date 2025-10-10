@@ -15,7 +15,7 @@ import {
 import Svg, { Circle, G, Text as SvgText } from "react-native-svg";
 
 const { width } = Dimensions.get("window");
-const apiUrl = "https://erp-pos-backend.onrender.com";
+const apiUrl = "https://point-of-sale-2.onrender.com";
 // const apiUrl = "http://192.168.0.103:8080";
 
 type SalesItem = {

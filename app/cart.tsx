@@ -83,21 +83,21 @@ export default function Cart() {
   // Step 1: Proceed-cart
   const handleCheckout = async () => {
     try {
-      const token = await SecureStore.getItemAsync("accessToken");
-      console.log("Token:", token);
-
-      if (!token) {
-        Alert.alert("Error", "User not authenticated");
-        return;
-      }
       const barcodes = cartItems.map((item) => item.barcode);
       if (barcodes.length === 0) {
         Alert.alert("Error", "Cart is empty");
         return;
       }
+      const token = await SecureStore.getItemAsync("accessToken");
+      console.log("Token is :", token);
+
+      if (!token) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
 
       const response = await fetch(
-        "https://erp-pos-backend.onrender.com/product/proceed-cart",
+        "https://point-of-sale-2.onrender.com/product/proceed-cart",
         {
           method: "POST",
           headers: {
@@ -138,11 +138,20 @@ export default function Cart() {
 
     try {
       setIsSubmitting(true);
+
+      const token = await SecureStore.getItemAsync("accessToken");
+      if (!token) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
       const response = await fetch(
-        "https://erp-pos-backend.onrender.com/finalize-sale",
+        "https://point-of-sale-2.onrender.com/product/finalize-sale",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             customerName,
             customerPhone,
