@@ -40,6 +40,16 @@ export default function Register() {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (!apiUrl) {
+    console.error(
+      "API URL is not set. Please check your environment variables."
+    );
+    Alert.alert(
+      "Configuration Error",
+      "API URL is not set. Please check your environment variables."
+    );
+  }
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -122,21 +132,18 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        "https://point-of-sale-2.onrender.com/auth/register",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username,
-            password,
-            email,
-            phoneNo: String(phoneNo),
-            additional_dtls: {},
-            profile_image: "",
-          }),
-        }
-      );
+      const response = await fetch(`${apiUrl}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          password,
+          email,
+          phoneNo: String(phoneNo),
+          additional_dtls: {},
+          profile_image: "",
+        }),
+      });
       const data = await response.json();
 
       if (response.ok) {

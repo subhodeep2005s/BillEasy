@@ -34,7 +34,16 @@ type Product = {
   brand?: string;
 };
 
-const apiUrl = "https://point-of-sale-2.onrender.com";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+console.log("API URL from env:", apiUrl);
+
+if (!apiUrl) {
+  console.error("API URL is not set. Please check your environment variables.");
+  Alert.alert(
+    "Configuration Error",
+    "API URL is not set. Please check your environment variables."
+  );
+}
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -924,7 +933,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     borderRadius: 16,
-    shadowColor: "#000",
+    shadowColor: "#000000ff",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -934,7 +943,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#10b981",
   },
   buttonContent: {
-    flexDirection: "row",
+    // flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,

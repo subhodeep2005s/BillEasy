@@ -21,6 +21,15 @@ export const options = {
 };
 const { width } = Dimensions.get("window");
 
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+if (!apiUrl) {
+  console.error("API URL is not set. Please check your environment variables.");
+  Alert.alert(
+    "Configuration Error",
+    "API URL is not set. Please check your environment variables."
+  );
+}
+
 type CartItem = {
   barcode: string;
   name: string;
@@ -96,17 +105,14 @@ export default function Cart() {
         return;
       }
 
-      const response = await fetch(
-        "https://point-of-sale-2.onrender.com/product/proceed-cart",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ barcodes }),
-        }
-      );
+      const response = await fetch(`${apiUrl}/product/proceed-cart`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ barcodes }),
+      });
 
       const result = await response.json();
       console.log("Proceed cart result:", result);
@@ -144,22 +150,19 @@ export default function Cart() {
         Alert.alert("Error", "User not authenticated");
         return;
       }
-      const response = await fetch(
-        "https://point-of-sale-2.onrender.com/product/finalize-sale",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            customerName,
-            customerPhone,
-            paymentMode,
-            cartId,
-          }),
-        }
-      );
+      const response = await fetch(`${apiUrl}/product/finalize-sale`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          customerName,
+          customerPhone,
+          paymentMode,
+          cartId,
+        }),
+      });
 
       const result = await response.json();
       console.log(JSON.stringify(result.bill));

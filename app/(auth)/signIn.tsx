@@ -19,6 +19,15 @@ import {
 
 const { width, height } = Dimensions.get("window");
 
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+if (!apiUrl) {
+  console.error("API URL is not set. Please check your environment variables.");
+  Alert.alert(
+    "Configuration Error",
+    "API URL is not set. Please check your environment variables."
+  );
+}
+
 export default function SignIn() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -60,14 +69,11 @@ export default function SignIn() {
 
     try {
       setLoading(true);
-      const response = await fetch(
-        "https://point-of-sale-2.onrender.com/auth/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        }
-      );
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
       const data = await response.json();
 
       if (response.ok && data.accessToken) {

@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   ScrollView,
   StatusBar,
@@ -15,7 +16,14 @@ import {
 import Svg, { Circle, G, Text as SvgText } from "react-native-svg";
 
 const { width } = Dimensions.get("window");
-const apiUrl = "https://point-of-sale-2.onrender.com";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+if (!apiUrl) {
+  console.error("API URL is not set. Please check your environment variables.");
+  Alert.alert(
+    "Configuration Error",
+    "API URL is not set. Please check your environment variables."
+  );
+}
 // const apiUrl = "http://192.168.0.103:8080";
 
 type SalesItem = {
