@@ -19,9 +19,10 @@ import {
 export const options = {
   headerShown: false,
 };
-const { width } = Dimensions.get("window");
 
+const { width } = Dimensions.get("window");
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+
 if (!apiUrl) {
   console.error("API URL is not set. Please check your environment variables.");
   Alert.alert(
@@ -41,12 +42,8 @@ type PaymentMode = "Cash" | "Card" | "UPI";
 
 export default function Cart() {
   const navigation = useNavigation();
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: false,
-    });
-  }, [navigation]);
   const router = useRouter();
+
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,6 +57,10 @@ export default function Cart() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const paymentOptions: PaymentMode[] = ["Cash", "Card", "UPI"];
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
 
   const loadCart = async () => {
     try {
@@ -75,11 +76,26 @@ export default function Cart() {
     }
   };
 
+  // ✅ UPDATED FUNCTION
   const handleRemove = async (barcode: string) => {
     try {
+      // Optimistically remove locally
       const updatedCart = cartItems.filter((item) => item.barcode !== barcode);
       setCartItems(updatedCart);
       await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
+
+      // Send request to backend silently
+      const token = await SecureStore.getItemAsync("accessToken");
+      if (!token) return;
+
+      await fetch(`${apiUrl}/product/remove-item`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ barcode }),
+      });
     } catch (error) {
       console.error("Error removing item:", error);
     }
@@ -89,7 +105,7 @@ export default function Cart() {
     loadCart();
   }, []);
 
-  // Step 1: Proceed-cart
+  // Proceed-cart
   const handleCheckout = async () => {
     try {
       const barcodes = cartItems.map((item) => item.barcode);
@@ -98,8 +114,6 @@ export default function Cart() {
         return;
       }
       const token = await SecureStore.getItemAsync("accessToken");
-      console.log("Token is :", token);
-
       if (!token) {
         Alert.alert("Error", "User not authenticated");
         return;
@@ -115,11 +129,9 @@ export default function Cart() {
       });
 
       const result = await response.json();
-      console.log("Proceed cart result:", result);
-
       if (response.ok) {
         setCartId(result.cartId);
-        setModalVisible(true); // open modal for customer details
+        setModalVisible(true);
       } else {
         Alert.alert("Error", result.error || "Failed to proceed cart");
       }
@@ -129,14 +141,13 @@ export default function Cart() {
     }
   };
 
-  // Step 2: Finalize-sale
+  // Finalize-sale
   const finalizeSale = async () => {
     if (!customerName.trim() || !customerPhone.trim() || !cartId) {
       Alert.alert("Error", "Please fill all details");
       return;
     }
 
-    // Basic phone validation
     if (customerPhone.length < 10) {
       Alert.alert("Error", "Please enter a valid phone number");
       return;
@@ -144,12 +155,9 @@ export default function Cart() {
 
     try {
       setIsSubmitting(true);
-
       const token = await SecureStore.getItemAsync("accessToken");
-      if (!token) {
-        Alert.alert("Error", "User not authenticated");
-        return;
-      }
+      if (!token) return;
+
       const response = await fetch(`${apiUrl}/product/finalize-sale`, {
         method: "POST",
         headers: {
@@ -165,14 +173,10 @@ export default function Cart() {
       });
 
       const result = await response.json();
-      console.log(JSON.stringify(result.bill));
-
       if (response.ok) {
         await AsyncStorage.removeItem("cart");
         setCartItems([]);
         setModalVisible(false);
-
-        // Reset form
         setCustomerName("");
         setCustomerPhone("");
         setPaymentMode("Cash");
@@ -181,12 +185,9 @@ export default function Cart() {
           pathname: "./BillPage",
           params: { bill: JSON.stringify(result.bill) },
         });
-      } else {
-        Alert.alert("Error", result.error || "Failed to finalize sale");
       }
     } catch (error) {
       console.error("Finalize error:", error);
-      Alert.alert("Error", "Failed to finalize sale");
     } finally {
       setIsSubmitting(false);
     }
@@ -206,7 +207,6 @@ export default function Cart() {
           return "cash-outline";
       }
     };
-
     return (
       <TouchableOpacity
         key={option}
@@ -318,7 +318,7 @@ export default function Cart() {
         </>
       )}
 
-      {/* Enhanced Modal */}
+      {/* Customer Details Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -377,7 +377,7 @@ export default function Cart() {
                   <Text style={styles.summaryText}>
                     Items: {cartItems.length}
                   </Text>
-                  <Text style={styles.summaryAmount}>${total.toFixed(2)}</Text>
+                  <Text style={styles.summaryAmount}>₹{total.toFixed(2)}</Text>
                 </View>
               </View>
             </View>
