@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,6 +11,7 @@ export default function RootLayout() {
   useEffect(() => {
     const checkAuth = async () => {
       const token = await SecureStore.getItemAsync("accessToken");
+
       setIsLoggedIn(!!token);
     };
     checkAuth();
@@ -29,6 +31,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar style="dark" backgroundColor="#ffffff" />
       <Stack screenOptions={{ headerShown: false }}>
         {isLoggedIn ? (
           <Stack.Screen name="(tabs)" />

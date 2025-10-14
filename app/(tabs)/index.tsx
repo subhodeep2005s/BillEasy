@@ -1,15 +1,16 @@
+import { apiUrl } from "@/config";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Link, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Animated,
   Dimensions,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -35,8 +36,6 @@ type Product = {
   productImage?: string;
   brand?: string;
 };
-
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 if (!apiUrl) {
   console.error("API URL is not set. Please check your environment variables.");
@@ -255,7 +254,7 @@ export default function App() {
   if (!permission.granted) {
     return (
       <SafeAreaView style={styles.permissionContainer} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+        <StatusBar style="dark" backgroundColor="#ffffff" />
         <View style={styles.permissionContent}>
           <View style={styles.permissionIconContainer}>
             <Ionicons name="camera-outline" size={80} color="#3b82f6" />
@@ -495,7 +494,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar style="dark" backgroundColor="#ffffff" />
 
       {/* Header */}
       <View style={styles.header}>

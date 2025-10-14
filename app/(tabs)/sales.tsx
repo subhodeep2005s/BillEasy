@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useState } from "react";
+import { apiUrl } from "@/config";
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +17,7 @@ import {
 // 192.168.0.103:8081
 
 const { width } = Dimensions.get("window");
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+
 if (!apiUrl) {
   console.error("API URL is not set. Please check your environment variables.");
   Alert.alert(

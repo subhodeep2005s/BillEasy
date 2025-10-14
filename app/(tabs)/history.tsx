@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { apiUrl } from "@/config";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,7 +17,7 @@ import {
 import Svg, { Circle, G, Text as SvgText } from "react-native-svg";
 
 const { width } = Dimensions.get("window");
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+
 if (!apiUrl) {
   console.error("API URL is not set. Please check your environment variables.");
   Alert.alert(

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { apiUrl } from "@/config";
 import {
   ActivityIndicator,
   Alert,
@@ -40,7 +41,6 @@ export default function Register() {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (!apiUrl) {
     console.error(
       "API URL is not set. Please check your environment variables."
