@@ -12,6 +12,7 @@ import {
   Dimensions,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -47,6 +48,8 @@ export default function App() {
   const [isScanningCheckout, setIsScanningCheckout] = useState(false);
   const [barcode, setBarcode] = useState("");
   const [isModalVisible, setModalVisible] = useState(false);
+  const [isBarcodeLessModalVisible, setBarcodeLessModalVisible] =
+    useState(false);
   const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [existingProduct, setExistingProduct] = useState<Product | null>(null);
   const [fabAnimation] = useState(new Animated.Value(0));
@@ -58,6 +61,18 @@ export default function App() {
     description: "",
     category: "",
     brand: "",
+  });
+
+  // Barcode-less product form
+  const [barcodeLessForm, setBarcodeLessForm] = useState({
+    name: "",
+    price: "",
+    quantity: "",
+    category: "",
+    brand: "",
+    isQuantized: false,
+    weight: "",
+    pricePerWeight: "",
   });
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -78,6 +93,10 @@ export default function App() {
 
   const updateProductForm = (field: string, value: string) => {
     setProductForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateBarcodeLessForm = (field: string, value: string | boolean) => {
+    setBarcodeLessForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const loadCartCount = async () => {
@@ -354,6 +373,7 @@ export default function App() {
           },
           body: JSON.stringify(requestBody),
         });
+        console.log(requestBody);
 
         const result = await response.json();
 
@@ -405,6 +425,7 @@ export default function App() {
           },
           body: JSON.stringify(requestBody),
         });
+        console.log(requestBody);
 
         const result = await response.json();
 
@@ -423,6 +444,84 @@ export default function App() {
       } finally {
         resetModal();
       }
+    }
+  };
+
+  const handleBarcodeLessSubmit = async () => {
+    if (
+      !barcodeLessForm.name.trim() ||
+      !barcodeLessForm.price.trim() ||
+      !barcodeLessForm.quantity.trim()
+    ) {
+      Alert.alert("Validation Error", "Please fill all required fields");
+      return;
+    }
+
+    if (barcodeLessForm.isQuantized) {
+      if (
+        !barcodeLessForm.weight.trim() ||
+        !barcodeLessForm.pricePerWeight.trim()
+      ) {
+        Alert.alert(
+          "Validation Error",
+          "Please fill weight and price per weight for quantized products"
+        );
+        return;
+      }
+    }
+
+    try {
+      const token = await SecureStore.getItemAsync("accessToken");
+
+      if (!token) {
+        Alert.alert("Authentication Error", "Please login again");
+        return;
+      }
+
+      const requestBody: any = {
+        barcode: "n/a",
+        name: barcodeLessForm.name.trim(),
+        price: parseFloat(barcodeLessForm.price),
+        quantity: parseInt(barcodeLessForm.quantity, 10),
+        productImage: "",
+        category: barcodeLessForm.category?.trim() || "",
+        brand: barcodeLessForm.brand?.trim() || "",
+        isQunatized: barcodeLessForm.isQuantized,
+      };
+
+      if (barcodeLessForm.isQuantized) {
+        requestBody.add_dtls = {
+          weight: parseFloat(barcodeLessForm.weight),
+          pricePerWeight: parseFloat(barcodeLessForm.pricePerWeight),
+        };
+      } else {
+        requestBody.add_dtls = {
+          weight: 0,
+          pricePerWeight: 0,
+        };
+      }
+
+      const response = await fetch(`${apiUrl}/product/add-product`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Success", "Barcode-less product added successfully!");
+        await fetchProducts();
+        resetBarcodeLessModal();
+      } else {
+        Alert.alert("Error", result.message || "Failed to add product");
+      }
+    } catch (error) {
+      console.error("Add barcode-less product error:", error);
+      Alert.alert("Network Error", "Failed to connect to server");
     }
   };
 
@@ -487,6 +586,20 @@ export default function App() {
     });
   };
 
+  const resetBarcodeLessModal = () => {
+    setBarcodeLessModalVisible(false);
+    setBarcodeLessForm({
+      name: "",
+      price: "",
+      quantity: "",
+      category: "",
+      brand: "",
+      isQuantized: false,
+      weight: "",
+      pricePerWeight: "",
+    });
+  };
+
   const fabScale = fabAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
@@ -510,11 +623,21 @@ export default function App() {
 
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.addProductIconButton}
+            style={styles.scanButton}
             onPress={() => setIsScanning(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="add-circle" size={26} color="#3b82f6" />
+            <Ionicons name="scan" size={20} color="white" />
+            <Text style={styles.scanButtonText}>Scan</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setBarcodeLessModalVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add" size={20} color="white" />
+            <Text style={styles.addButtonText}>Add</Text>
           </TouchableOpacity>
 
           <Link href="./cart" asChild>
@@ -624,7 +747,7 @@ export default function App() {
         </View>
       )}
 
-      {/* Product Modal */}
+      {/* Product Modal (for scanned products) */}
       <Modal
         isVisible={isModalVisible}
         onBackdropPress={resetModal}
@@ -857,6 +980,215 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {/* Barcode-less Product Modal */}
+      <Modal
+        isVisible={isBarcodeLessModalVisible}
+        onBackdropPress={resetBarcodeLessModal}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        backdropOpacity={0.6}
+        style={styles.modal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="cube-outline" size={24} color="#10b981" />
+                </View>
+                <Text style={styles.modalTitle}>Add Barcode-less Product</Text>
+              </View>
+              <TouchableOpacity
+                onPress={resetBarcodeLessModal}
+                style={styles.modalCloseButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={26} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.modalBody}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.addProductForm}>
+                <View style={styles.barcodeLessBanner}>
+                  <Ionicons
+                    name="information-circle"
+                    size={22}
+                    color="#10b981"
+                  />
+                  <View style={styles.bannerContent}>
+                    <Text style={styles.barcodeLessBannerTitle}>
+                      No Barcode Required
+                    </Text>
+                    <Text style={styles.barcodeLessBannerText}>
+                      Add products without scanning
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>
+                    Product Name <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter product name"
+                    placeholderTextColor="#9ca3af"
+                    value={barcodeLessForm.name}
+                    onChangeText={(text) => updateBarcodeLessForm("name", text)}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputRow}>
+                  <View style={styles.inputHalf}>
+                    <Text style={styles.inputLabel}>
+                      Price (₹) <Text style={styles.required}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="0.00"
+                      placeholderTextColor="#9ca3af"
+                      keyboardType="decimal-pad"
+                      value={barcodeLessForm.price}
+                      onChangeText={(text) =>
+                        updateBarcodeLessForm("price", text)
+                      }
+                    />
+                  </View>
+
+                  <View style={styles.inputHalf}>
+                    <Text style={styles.inputLabel}>
+                      Quantity <Text style={styles.required}>*</Text>
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="0"
+                      placeholderTextColor="#9ca3af"
+                      keyboardType="number-pad"
+                      value={barcodeLessForm.quantity}
+                      onChangeText={(text) =>
+                        updateBarcodeLessForm("quantity", text)
+                      }
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputRow}>
+                  <View style={styles.inputHalf}>
+                    <Text style={styles.inputLabel}>Category</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., Groceries"
+                      placeholderTextColor="#9ca3af"
+                      value={barcodeLessForm.category}
+                      onChangeText={(text) =>
+                        updateBarcodeLessForm("category", text)
+                      }
+                    />
+                  </View>
+
+                  <View style={styles.inputHalf}>
+                    <Text style={styles.inputLabel}>Brand</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., Local"
+                      placeholderTextColor="#9ca3af"
+                      value={barcodeLessForm.brand}
+                      onChangeText={(text) =>
+                        updateBarcodeLessForm("brand", text)
+                      }
+                    />
+                  </View>
+                </View>
+
+                {/* Quantized Toggle */}
+                <View style={styles.switchContainer}>
+                  <View style={styles.switchLeft}>
+                    <Ionicons name="scale-outline" size={24} color="#3b82f6" />
+                    <View>
+                      <Text style={styles.switchLabel}>Quantized Product</Text>
+                      <Text style={styles.switchDescription}>
+                        Sold by weight (kg, grams, etc.)
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={barcodeLessForm.isQuantized}
+                    onValueChange={(value) =>
+                      updateBarcodeLessForm("isQuantized", value)
+                    }
+                    trackColor={{ false: "#d1d5db", true: "#93c5fd" }}
+                    thumbColor={
+                      barcodeLessForm.isQuantized ? "#3b82f6" : "#f3f4f6"
+                    }
+                  />
+                </View>
+
+                {/* Conditional Weight Fields */}
+                {barcodeLessForm.isQuantized && (
+                  <View style={styles.quantizedSection}>
+                    <View style={styles.quantizedHeader}>
+                      <Ionicons
+                        name="analytics-outline"
+                        size={20}
+                        color="#10b981"
+                      />
+                      <Text style={styles.quantizedTitle}>Weight Details</Text>
+                    </View>
+
+                    <View style={styles.inputRow}>
+                      <View style={styles.inputHalf}>
+                        <Text style={styles.inputLabel}>
+                          Weight <Text style={styles.required}>*</Text>
+                        </Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="e.g., 10"
+                          placeholderTextColor="#9ca3af"
+                          keyboardType="decimal-pad"
+                          value={barcodeLessForm.weight}
+                          onChangeText={(text) =>
+                            updateBarcodeLessForm("weight", text)
+                          }
+                        />
+                      </View>
+
+                      <View style={styles.inputHalf}>
+                        <Text style={styles.inputLabel}>
+                          Price/Weight <Text style={styles.required}>*</Text>
+                        </Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="e.g., 100"
+                          placeholderTextColor="#9ca3af"
+                          keyboardType="decimal-pad"
+                          value={barcodeLessForm.pricePerWeight}
+                          onChangeText={(text) =>
+                            updateBarcodeLessForm("pricePerWeight", text)
+                          }
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleBarcodeLessSubmit}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={22} color="white" />
+                  <Text style={styles.saveButtonText}>Add Product</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -966,10 +1298,35 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
-  addProductIconButton: {
-    padding: 8,
+  scanButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#3b82f6",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    gap: 6,
+  },
+  scanButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  addButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#10b981",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    gap: 6,
+  },
+  addButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
   },
   cartButton: {
     position: "relative",
@@ -1310,6 +1667,27 @@ const styles = StyleSheet.create({
     color: "#3b82f6",
     fontWeight: "600",
   },
+  barcodeLessBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#d1fae5",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    gap: 12,
+  },
+  barcodeLessBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#065f46",
+    marginBottom: 4,
+  },
+  barcodeLessBannerText: {
+    fontSize: 13,
+    color: "#10b981",
+    fontWeight: "500",
+  },
   inputContainer: {
     gap: 8,
   },
@@ -1343,6 +1721,50 @@ const styles = StyleSheet.create({
     minHeight: 100,
     paddingTop: 14,
     textAlignVertical: "top",
+  },
+  switchContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  switchLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  switchLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1f2937",
+    marginBottom: 2,
+  },
+  switchDescription: {
+    fontSize: 13,
+    color: "#6b7280",
+  },
+  quantizedSection: {
+    backgroundColor: "#d1fae5",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    gap: 16,
+  },
+  quantizedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quantizedTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#065f46",
   },
   saveButton: {
     backgroundColor: "#3b82f6",
